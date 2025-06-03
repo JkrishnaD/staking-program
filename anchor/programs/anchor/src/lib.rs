@@ -109,6 +109,19 @@ mod anchor {
 
         Ok(())
     }
+
+    pub fn get_points(ctx: Context<GetPoints>) -> Result<()> {
+        let stake_account = &ctx.accounts.stake_account;
+        let clock = Clock::get()?;
+
+        //calculating the points without updating them in the account
+        let time_elapsed = clock.unix_timestamp
+            .checked_sub(stake_account.last_stake_time)
+            .ok_or(StakeError::InvalidTimeStamp)? as u64;
+
+        let new_points = calculate_points(stake_account.staked_amount, time_elapsed)?;
+        Ok(())
+    }
 }
 
 fn update_points(account: &mut StakeAccount, current_time: i64) -> Result<()> {
@@ -195,6 +208,18 @@ pub struct ClaimPoints<'info> {
 
     #[account(
         mut,
+        seeds = [b"user_stake",user.key().as_ref()],
+        bump,
+        constraint = stake_account.owner == user.key() @ StakeError::UnAuthorised
+    )]
+    pub stake_account: Account<'info, StakeAccount>,
+}
+#[derive(Accounts)]
+pub struct GetPoints<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
         seeds = [b"user_stake",user.key().as_ref()],
         bump,
         constraint = stake_account.owner == user.key() @ StakeError::UnAuthorised
